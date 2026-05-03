@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pornhub Thumbnail & GIF Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PH Thumbnail & GIF Extractor</h1>
+            <p>Paste a Pornhub video URL to extract thumbnail and preview GIF</p>
+        </header>
+
+        <div class="input-section">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="videoUrl" 
+                    placeholder="Paste Pornhub video URL here... (e.g., https://www.pornhub.com/view_video.php?viewkey=ph5f3a2b1c4d8e9)"
+                    autocomplete="off"
+                >
+                <button id="extractBtn" onclick="extractMedia()">
+                    <span class="btn-text">Extract</span>
+                    <span class="btn-loader hidden"></span>
+                </button>
+            </div>
+            <p class="hint">Supports: pornhub.com, pornhub.org, pornhub.net URLs</p>
+        </div>
+
+        <div id="error-message" class="error hidden"></div>
+
+        <div id="results" class="results hidden">
+            <div class="media-card">
+                <h3>Thumbnail</h3>
+                <div class="image-container">
+                    <img id="thumbnail" src="" alt="Video Thumbnail">
+                </div>
+                <div class="media-info">
+                    <p id="thumb-dimensions"></p>
+                    <div class="btn-group">
+                        <button class="copy-btn" onclick="copyLink('thumb')">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy Link
+                        </button>
+                        <button class="download-btn" onclick="downloadMedia('thumb')">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download
+                        </button>
+                    </div>
+                </div>
+            </div>
+ 
+        <div id="video-info" class="video-info hidden">
+            <h3>Video Details</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Title:</span>
+                    <span id="video-title" class="value"></span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Duration:</span>
+                    <span id="video-duration" class="value"></span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Porn Star:</span>
+                    <span id="video-pornstar" class="value"></span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Category:</span>
+                    <span id="video-category" class="value"></span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Viewkey:</span>
+                    <span id="video-viewkey" class="value"></span>
+                </div>
+                <div class="info-item full-width">
+                    <span class="label">Embed Link:</span>
+                    <div class="copy-input-group">
+                        <input type="text" id="video-embed" readonly>
+                        <button onclick="copyLink('embed')">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden">Copied to clipboard!</div>
+
+    <script src="app.js"></script>
+</body>
+</html>
