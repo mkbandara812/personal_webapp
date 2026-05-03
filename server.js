@@ -28,8 +28,16 @@ app.use((req, res, next) => {
     res.status(401).send('Access Denied. Please enter username and password.');
 });
 
-// Serve static files from the current directory (where index.html is)
-app.use(express.static(__dirname));
+// Serve static files explicitly for Vercel
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+app.get('/app.js', (req, res) => {
+    res.sendFile(path.join(__dirname, 'app.js'));
+});
+app.get('/styles.css', (req, res) => {
+    res.sendFile(path.join(__dirname, 'styles.css'));
+});
 
 // Google Sheets Configuration
 const SHEET_ID = '1uymVxwjHpXovTvsW7EcWVJrAVrRCTXr9WBzCdEOuXhA';
