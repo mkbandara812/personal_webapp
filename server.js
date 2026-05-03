@@ -129,53 +129,85 @@ app.get('/api/extract', async (req, res) => {
     const canonicalUrl = `https://www.pornhub.com/view_video.php?viewkey=${viewkey}`;
 
     try {
-        console.log(`Fetching: ${canonicalUrl}`);
+        console.log(`Fetching API for viewkey: ${viewkey}`);
 
-        const response = await axios.get(canonicalUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Cookie': 'age_verified=1'
-            },
-            timeout: 10000
-        });
+        let thumbnail = null;
+        let title = 'Unknown Title';
+        let duration = 'Unknown';
+        const pornstars = [];
+        const allCategories = [];
 
-        const $ = cheerio.load(response.data);
-        const html = response.data;
-
-        let thumbnail = $('meta[property="og:image"]').attr('content');
-        let title = $('meta[property="og:title"]').attr('content') || $('h1.video-title').text() || 'Unknown Title';
-        function formatDuration(duration) {
-            if (!duration) return 'Unknown';
-            if (typeof duration === 'string' && duration.includes(':')) return duration;
-
-            const seconds = parseInt(duration);
-            if (isNaN(seconds)) return duration;
-
-            const hrs = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            const secs = Math.floor(seconds % 60);
-
-            if (hrs > 0) {
-                return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        // Primary Method: Webmasters API
+        try {
+            const apiRes = await axios.get(`https://www.pornhub.com/webmasters/video_by_id?id=${viewkey}`, { timeout: 10000 });
+            if (apiRes.data && apiRes.data.video) {
+                const v = apiRes.data.video;
+                title = v.title || title;
+                thumbnail = v.default_thumb || v.thumb;
+                duration = v.duration || duration;
+                
+                if (v.pornstars && Array.isArray(v.pornstars)) {
+                    v.pornstars.forEach(p => {
+                        if (p.pornstar_name) pornstars.push(p.pornstar_name);
+                    });
+                }
+                
+                if (v.categories && Array.isArray(v.categories)) {
+                    v.categories.forEach(c => {
+                        if (c.category) allCategories.push(c.category);
+                    });
+                }
             }
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        } catch (apiErr) {
+            console.error('Webmasters API failed, falling back to scraper...');
         }
 
-        let rawDuration = $('meta[property="video:duration"]').attr('content') || '';
-        let duration = formatDuration(rawDuration);
+        // Fallback Method: Scraper (if API fails or doesn't return thumbnail)
+        if (!thumbnail) {
+            try {
+                const response = await axios.get(canonicalUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Cookie': 'age_verified=1'
+                    },
+                    timeout: 10000
+                });
 
-        const pornstars = [];
-        $('.pornstarsWrapper a.item, .pornstarsWrapper a').each((i, el) => {
-            const name = $(el).text().trim();
-            if (name && !pornstars.includes(name)) pornstars.push(name);
-        });
+                const $ = cheerio.load(response.data);
+                thumbnail = $('meta[property="og:image"]').attr('content');
+                title = $('meta[property="og:title"]').attr('content') || $('h1.video-title').text() || title;
+                
+                let rawDuration = $('meta[property="video:duration"]').attr('content') || '';
+                if (rawDuration) {
+                    const seconds = parseInt(rawDuration);
+                    if (!isNaN(seconds)) {
+                        const hrs = Math.floor(seconds / 3600);
+                        const mins = Math.floor((seconds % 3600) / 60);
+                        const secs = Math.floor(seconds % 60);
+                        duration = hrs > 0 ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}` : `${mins}:${secs.toString().padStart(2, '0')}`;
+                    }
+                }
 
-        const allCategories = [];
-        $('.categoriesWrapper a.item, .categoriesWrapper a').each((i, el) => {
-            const name = $(el).text().trim();
-            if (name && name !== '+' && !allCategories.includes(name)) allCategories.push(name);
-        });
+                $('.pornstarsWrapper a.item, .pornstarsWrapper a').each((i, el) => {
+                    const name = $(el).text().trim();
+                    if (name && !pornstars.includes(name)) pornstars.push(name);
+                });
+
+                $('.categoriesWrapper a.item, .categoriesWrapper a').each((i, el) => {
+                    const name = $(el).text().trim();
+                    if (name && name !== '+' && !allCategories.includes(name)) allCategories.push(name);
+                });
+                
+                const scriptContent = $('script').map((i, el) => $(el).html()).get().join('\n');
+                const highResMatch = scriptContent.match(/"image_url"\s*:\s*"([^"]+)"/);
+                if (highResMatch) {
+                    const potentialHighRes = highResMatch[1].replace(/\\/g, '');
+                    if (potentialHighRes) thumbnail = potentialHighRes;
+                }
+            } catch (scrapeErr) {
+                console.error('Scraper also failed');
+            }
+        }
 
         const genericTags = ['HD Porn', 'Exclusive', 'Verified Amateurs', '60FPS', '4K', 'Pornstar'];
         const priorityNiches = ['Anal', 'Teen', 'MILF', 'Lesbian', 'Threesome', 'Creampie', 'Squirting', 'Blowjob', 'Big Tits', 'Big Ass', 'Ebony', 'Asian', 'Latina', 'BBW', 'BDSM', 'Hardcore'];
@@ -191,28 +223,6 @@ app.get('/api/extract', async (req, res) => {
 
         const embedUrl = `https://www.pornhub.com/embed/${viewkey}`;
         const embedCode = `<iframe src="${embedUrl}" frameborder="0" width="1200" height="720" scrolling="no" allowfullscreen></iframe>`;
-
-        const scriptContent = $('script').map((i, el) => $(el).html()).get().join('\n');
-
-        const highResMatch = scriptContent.match(/"image_url"\s*:\s*"([^"]+)"/);
-        if (highResMatch) {
-            const potentialHighRes = highResMatch[1].replace(/\\/g, '');
-            if (potentialHighRes) thumbnail = potentialHighRes;
-        }
-
-        if (!thumbnail) {
-            console.log('Scraping failed to find thumbnail, trying HubTraffic API fallback...');
-            try {
-                const apiRes = await axios.get(`https://api.hubtraffic.com/Api.php?id=${viewkey}&action=get_video_by_id`);
-                if (apiRes.data && apiRes.data.video) {
-                    thumbnail = apiRes.data.video.default_thumb || apiRes.data.video.thumb;
-                    title = apiRes.data.video.title || title;
-                    duration = apiRes.data.video.duration || duration;
-                }
-            } catch (apiErr) {
-                console.error('API Fallback also failed');
-            }
-        }
 
         if (!thumbnail) {
             return res.status(404).json({ error: 'Could not find valid thumbnail URL. The video might be private or deleted.' });
